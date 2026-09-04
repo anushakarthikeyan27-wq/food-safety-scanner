@@ -1,401 +1,528 @@
-// ============================================
-// SCANSAFE — Core App Logic & Global Parser
-// ============================================
+/**
+ * ScanSafe Engine v2.0 - Core Logic
+ * Includes advanced tokenization, E-number parsing, hazard scoring, and dynamic UI rendering.
+ */
 
-document.addEventListener("DOMContentLoaded", () => {
+// ==========================================
+// 1. INGREDIENT DATABASE
+// ==========================================
+const INGREDIENT_DB = [
+  {
+    id: "ing-1400",
+    name: "Maltodextrin",
+    aka: ["ins 1400", "1400", "e1400", "dextrin"],
+    verdict: "caution",
+    category: "High-Glycemic Filler",
+    summary: "Fast-digesting carbohydrate that rapidly spikes blood sugar levels.",
+    whatItIs: "A heavily processed starch powder used as a thickener, filler, or preservative.",
+    allergens: [],
+    dietaryFlags: ["High Glycemic Index", "Ultra-Processed"],
+    normalEffects: "Provides rapid energy; can cause sudden blood glucose spikes higher than table sugar.",
+    excessEffects: "May negatively impact gut microbiota balance and exacerbate insulin resistance.",
+    regulatory: "US FDA GRAS (Generally Recognized as Safe)."
+  },
+  {
+    id: "ing-322",
+    name: "Soy Lecithin",
+    aka: ["ins 322", "322", "e322", "lecithin", "soy lecithin (ins 322)"],
+    verdict: "safe",
+    category: "Emulsifier",
+    summary: "Common emulsifier derived from soybeans; helps blend fats and water.",
+    whatItIs: "A fatty substance extracted from soybeans used to improve texture and shelf stability.",
+    allergens: ["Soy"],
+    dietaryFlags: [],
+    normalEffects: "Completely safe for the general population; excellent source of choline.",
+    excessEffects: "May trigger reactions in individuals with severe soy allergies.",
+    regulatory: "Approved globally for general food use."
+  },
+  {
+    id: "ing-223",
+    name: "Sodium Metabisulfite",
+    aka: ["ins 223", "223", "e223", "disodium disulfite", "pyrosulfite"],
+    verdict: "danger",
+    category: "Preservative / Antioxidant",
+    summary: "Sulfite preservative used to prevent browning and extend shelf life.",
+    whatItIs: "An inorganic compound used as a bleach and disinfectant in wine, dried fruit, and bakery items.",
+    allergens: ["Sulfites"],
+    dietaryFlags: ["Sensitivity Concern"],
+    normalEffects: "Can cause severe asthmatic or allergic reactions in sensitive individuals.",
+    excessEffects: "May cause gastrointestinal irritation, headaches, and respiratory distress.",
+    regulatory: "Strictly regulated; requires clear allergen labeling."
+  },
+  {
+    id: "ing-503ii",
+    name: "Ammonium Bicarbonate",
+    aka: ["ins 503ii", "ins 503", "503ii", "503", "e503", "hartshorn"],
+    verdict: "safe",
+    category: "Leavening Agent",
+    summary: "Traditional baker's ammonia used as a raising agent in crisp baked goods.",
+    whatItIs: "A chemical compound that releases carbon dioxide gas when heated to make dough rise.",
+    allergens: [],
+    dietaryFlags: [],
+    normalEffects: "Completely decomposes into gases during baking, leaving no harmful residues.",
+    excessEffects: "No notable health risks when consumed in baked food products.",
+    regulatory: "Approved globally for food manufacturing."
+  },
+  {
+    id: "ing-500ii",
+    name: "Sodium Bicarbonate",
+    aka: ["ins 500ii", "ins 500", "500ii", "500", "e500", "baking soda"],
+    verdict: "safe",
+    category: "Leavening Agent",
+    summary: "Standard baking soda used for leavening and alkalinity control.",
+    whatItIs: "A soluble alkaline salt used to release carbon dioxide in batters and doughs.",
+    allergens: [],
+    dietaryFlags: [],
+    normalEffects: "Safe for general consumption; aids in reducing gastric acidity.",
+    excessEffects: "Excessive consumption can contribute to high dietary sodium intake.",
+    regulatory: "GRAS approved globally."
+  },
+  {
+    id: "ing-471",
+    name: "Mono- and Diglycerides of Fatty Acids",
+    aka: ["ins 471", "471", "e471", "monoglycerides", "diglycerides"],
+    verdict: "caution",
+    category: "Emulsifier",
+    summary: "Synthetic fat additive used to blend oil and water and extend softness.",
+    whatItIs: "Fats produced from glycerol and fatty acids; may contain small amounts of trans fats.",
+    allergens: [],
+    dietaryFlags: ["Ultra-Processed"],
+    normalEffects: "Digested in the body similarly to natural fats.",
+    excessEffects: "May contribute small amounts of hidden trans fats to the diet over time.",
+    regulatory: "Approved for food use globally."
+  },
+  {
+    id: "ing-481i",
+    name: "Sodium Stearoyl Lactylate",
+    aka: ["ins 481i", "ins 481", "481i", "481", "e481", "ssl"],
+    verdict: "safe",
+    category: "Dough Conditioner / Emulsifier",
+    summary: "Used in baked goods to strengthen dough and improve crumb structure.",
+    whatItIs: "A food additive produced from stearic acid and lactic acid.",
+    allergens: [],
+    dietaryFlags: [],
+    normalEffects: "Safe for human consumption; metabolized easily into lactic and stearic acids.",
+    excessEffects: "No toxicological hazards identified at normal dietary levels.",
+    regulatory: "GRAS approved."
+  },
+  {
+    id: "ing-321",
+    name: "BHT (Butylated Hydroxytoluene)",
+    aka: ["ins 321", "321", "e321", "butylated hydroxytoluene"],
+    verdict: "danger",
+    category: "Synthetic Antioxidant / Preservative",
+    summary: "Synthetic chemical used to prevent oil rancidity in packaged foods.",
+    whatItIs: "A lab-made antioxidant preservative commonly used in oils, cereals, and snack foods.",
+    allergens: [],
+    dietaryFlags: ["Endocrine Disruptor Risk", "Synthetic Preservative"],
+    normalEffects: "Banned or restricted in food applications in several international jurisdictions.",
+    excessEffects: "Linked in animal studies to liver stress, thyroid alterations, and metabolic toxicity.",
+    regulatory: "Restricted in Europe and Japan; permitted with limitations in US/FDA guidelines."
+  },
+  {
+    id: "ing-202",
+    name: "Potassium Sorbate",
+    aka: ["ins 202", "202", "e202", "sorbate"],
+    verdict: "safe",
+    category: "Preservative",
+    summary: "Widely used antimicrobial agent that prevents mold and yeast growth.",
+    whatItIs: "A potassium salt of sorbic acid that breaks down into water and CO2 in the body.",
+    allergens: [],
+    dietaryFlags: [],
+    normalEffects: "Non-toxic; efficiently metabolized like natural fatty acids.",
+    excessEffects: "Rare instances of localized allergic skin hypersensitivity.",
+    regulatory: "Globally approved preservative."
+  },
+  {
+    id: "ing-102",
+    name: "Tartrazine",
+    aka: ["ins 102", "102", "e102", "yellow 5", "fd&c yellow no. 5"],
+    verdict: "danger",
+    category: "Synthetic Food Color",
+    summary: "Lemon yellow azo dye used to impart vibrant artificial color to foods.",
+    whatItIs: "A coal-tar-derived synthetic dye frequently added to beverages, snacks, and sweets.",
+    allergens: ["Azo Dye Sensitivity"],
+    dietaryFlags: ["Hyperactivity Link", "Artificial Color"],
+    normalEffects: "Requires warning labels in Europe due to behavioral links in children.",
+    excessEffects: "Associated with hyperactivity in children, hives, asthma spikes, and migraines.",
+    regulatory: "Banned or restricted in select Scandinavian countries; requires warning tags in the EU."
+  },
+  {
+    id: "ing-150d",
+    name: "Caramel Color (Class IV)",
+    aka: ["ins 150d", "150d", "e150d", "caramel color", "caramel iv"],
+    verdict: "caution",
+    category: "Coloring Agent",
+    summary: "Dark brown coloring agent manufactured with ammonia and sulfite compounds.",
+    whatItIs: "A concentrated brown food dye produced by heating carbohydrates with chemical catalysts.",
+    allergens: [],
+    dietaryFlags: ["Ultra-Processed"],
+    normalEffects: "Provides dark coloration to soft drinks, sauces, and baked goods.",
+    excessEffects: "Class IV caramel colors contain trace amounts of 4-MEI, a compound flagged in high doses.",
+    regulatory: "Approved with maximum intake thresholds in US and EU."
+  },
+  {
+    id: "ing-hfcs",
+    name: "High Fructose Corn Syrup",
+    aka: ["hfcs", "isoglucose", "glucose-fructose syrup"],
+    verdict: "danger",
+    category: "Added Sweetener",
+    summary: "Liquid sweetener made from cornstarch converted to fructose.",
+    whatItIs: "A highly processed caloric sweetener linked directly to metabolic strain.",
+    allergens: [],
+    dietaryFlags: ["High Glycemic Index", "Ultra-Processed"],
+    normalEffects: "Processed almost entirely in the liver; rapidly increases blood sugar.",
+    excessEffects: "Strongly associated with non-alcoholic fatty liver disease, type 2 diabetes, and obesity.",
+    regulatory: "Permitted, but heavily advised against by health organizations."
+  },
+  {
+    id: "ing-wheat",
+    name: "Enriched Wheat Flour",
+    aka: ["wheat flour", "refined wheat flour", "maida", "fortified flour"],
+    verdict: "safe",
+    category: "Grain Base",
+    summary: "Milled wheat flour fortified with essential synthetic B vitamins and iron.",
+    whatItIs: "Standard refined cereal flour with bran and germ removed.",
+    allergens: ["Gluten"],
+    dietaryFlags: [],
+    normalEffects: "Primary staple food carbohydrate base.",
+    excessEffects: "High glycemic index relative to whole grains; unsafe for celiac patients.",
+    regulatory: "Standard food staple."
+  },
+  {
+    id: "ing-citric",
+    name: "Citric Acid",
+    aka: ["ins 330", "330", "e330"],
+    verdict: "safe",
+    category: "Acidulant / Flavoring",
+    summary: "Natural acidifier that adds sour taste and acts as a natural antioxidant.",
+    whatItIs: "An organic acid found naturally in citrus fruits, produced commercially via fermentation.",
+    allergens: [],
+    dietaryFlags: [],
+    normalEffects: "Harmless organic acid involved in natural human metabolism.",
+    excessEffects: "Excessive concentrated intake can erode tooth enamel over time.",
+    regulatory: "GRAS approved."
+  }
+];
 
-  /* ---------------------------------------
-     0. CONFIGURATION & CONSTANTS
-  --------------------------------------- */
-  // Paste your personal free key from https://ocr.space/ocrapi inside the quotes below
-  const OCR_SPACE_API_KEY = "K84354423788957"; 
+// Active State Storage
+let currentAnalyzedIngredients = [];
+let currentFilter = "all";
 
-  /* ---------------------------------------
-     1. TAB SWITCHING
-  --------------------------------------- */
-  const tabBtns = document.querySelectorAll(".tab-btn");
-  const tabPanels = document.querySelectorAll(".tab-panel");
+// ==========================================
+// 2. PARSING & MATCHING ENGINE
+// ==========================================
 
-  tabBtns.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      tabBtns.forEach((b) => b.classList.remove("is-active"));
-      tabPanels.forEach((p) => p.classList.remove("is-active"));
-      btn.classList.add("is-active");
-      document.getElementById(`tab-${btn.dataset.tab}`).classList.add("is-active");
-    });
-  });
+/**
+ * Splits raw label input intelligently without destroying nested parenthetical data.
+ */
+function splitRawIngredients(rawInput) {
+  if (!rawInput || typeof rawInput !== "string") return [];
 
-  /* ---------------------------------------
-     2. SMART TEXT CLEANER & INS PARSER
-  --------------------------------------- */
-  function parseIngredientToken(rawText) {
-    if (!rawText) return null;
+  // Replace newlines and clean redundant spaces
+  let cleaned = rawInput.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
 
-    let text = rawText.trim().toLowerCase();
+  // Split on commas or semicolons NOT inside parentheses
+  const tokens = [];
+  let currentToken = "";
+  let insideParentheses = 0;
 
-    // Skip junk tokens completely
-    if (
-      !text ||
-      text === 'ii' ||
-      text === 'i' ||
-      text === 'iii' ||
-      /^\d+%$/.test(text) ||
-      text.includes('numbers in brackets') ||
-      text.includes('international numbering system')
-    ) {
-      return null;
+  for (let i = 0; i < cleaned.length; i++) {
+    const char = cleaned[i];
+    if (char === "(" || char === "[") insideParentheses++;
+    if (char === ")" || char === "]") insideParentheses = Math.max(0, insideParentheses - 1);
+
+    if ((char === "," || char === ";") && insideParentheses === 0) {
+      if (currentToken.trim()) tokens.push(currentToken.trim());
+      currentToken = "";
+    } else {
+      currentToken += char;
     }
+  }
+  if (currentToken.trim()) tokens.push(currentToken.trim());
 
-    // Clean out percentage symbols, brackets, and extra spaces
-    let cleaned = text
-      .replace(/\d+%/g, '')
-      .replace(/\[|\]|\(|\)|\*|&/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+  return tokens;
+}
 
-    if (cleaned.length < 2) return null;
+/**
+ * Normalizes text and matches against INGREDIENT_DB or builds a fallback object.
+ */
+function parseIngredientToken(rawToken) {
+  if (!rawToken) return null;
 
-    // Check direct match in INGREDIENT_DB
-    let found = INGREDIENT_DB.find((item) =>
-      item.name.toLowerCase() === cleaned ||
-      item.aka.some((a) => a.toLowerCase() === cleaned)
+  let original = rawToken.trim();
+  let normalized = original
+    .toLowerCase()
+    .replace(/\d+%/g, "")               // Remove percentage numbers (e.g. 10%)
+    .replace(/\[|\]/g, "")              // Remove square brackets
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (normalized.length < 2) return null;
+
+  // Extract potential E/INS code (e.g. "INS 1400", "503ii", "E102", "150d")
+  const codeMatch = normalized.match(/(?:ins|e)?\s*([1-9][0-9]{2,3}(?:[a-z]{1,3})?)\b/i);
+  const extractedCode = codeMatch ? codeMatch[1].toLowerCase() : null;
+  const baseCode = extractedCode ? extractedCode.replace(/[a-z]+$/i, "") : null;
+
+  // Clean string without parentheses for name matching
+  let cleanNameOnly = normalized.replace(/\(.*?\)/g, "").replace(/\s+/g, " ").trim();
+
+  // PASS 1: Direct Match on DB Name or Exact Alias
+  let found = INGREDIENT_DB.find((item) =>
+    item.name.toLowerCase() === normalized ||
+    item.name.toLowerCase() === cleanNameOnly ||
+    item.aka.some((alias) => alias.toLowerCase() === normalized || alias.toLowerCase() === cleanNameOnly)
+  );
+
+  // PASS 2: Match by Extracted INS / E-Number Code
+  if (!found && extractedCode) {
+    found = INGREDIENT_DB.find((item) =>
+      item.aka.some((alias) => {
+        const lowerAlias = alias.toLowerCase();
+        return (
+          lowerAlias === extractedCode ||
+          lowerAlias === `ins ${extractedCode}` ||
+          lowerAlias === `e${extractedCode}` ||
+          (baseCode && (lowerAlias === baseCode || lowerAlias === `ins ${baseCode}`))
+        );
+      })
     );
+  }
 
-    if (found) return found;
+  // PASS 3: Partial / Contains Substring Match
+  if (!found) {
+    found = INGREDIENT_DB.find((item) =>
+      cleanNameOnly.length > 3 && item.name.toLowerCase().includes(cleanNameOnly)
+    );
+  }
 
-    // Extract potential INS/E-Numbers (e.g. 503, 500, 472e, 223, 150d)
-    const insMatch = cleaned.match(/\b([1-9][0-9]{2,3}[a-z]?)\b/);
-    if (insMatch) {
-      const code = insMatch[1];
-      found = INGREDIENT_DB.find((item) =>
-        item.aka.some((a) => a.toLowerCase() === code || a.toLowerCase() === `ins ${code}`)
-      );
-      if (found) return found;
-    }
-
-    // Default Fallback (Eliminates "Not in database")
+  // Return Matched Record if Found
+  if (found) {
     return {
-      id: "gen-" + Math.random().toString(36).substr(2, 5),
-      name: capitalizeWords(cleaned),
-      verdict: "safe",
-      summary: "Standard natural or recognized culinary ingredient.",
-      category: "Food Ingredient",
-      whatItIs: "Common ingredient used in standard food formulations.",
-      history: "Widely used across commercial and household food recipes.",
-      commonlyFoundIn: ["Packaged foods", "Bakery items"],
-      normalEffects: "Safe for standard dietary consumption.",
-      excessEffects: "No notable risks recorded for typical dietary levels.",
-      regulatory: "Permitted for general food use.",
-      alternatives: "N/A"
+      ...found,
+      rawMatchedText: original
     };
   }
 
-  /* ---------------------------------------
-     3. PRODUCT BARCODE & TEXT SEARCH
-  --------------------------------------- */
-  const barcodeInput = document.getElementById("barcodeInput");
-  const scanBtn = document.getElementById("scanBtn");
-  const scanResult = document.getElementById("scanResult");
+  // PASS 4: Smart Dynamic Fallback for Unrecognized Items
+  const formattedName = cleanNameOnly
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 
-  scanBtn.addEventListener("click", lookupProduct);
-  barcodeInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") lookupProduct();
+  return {
+    id: "gen-" + Math.random().toString(36).substring(2, 7),
+    name: formattedName || original,
+    rawMatchedText: original,
+    verdict: "safe",
+    category: "Standard Ingredient",
+    summary: "Recognized as a standard food or processing ingredient.",
+    whatItIs: "Common culinary component or conventional food input.",
+    allergens: [],
+    dietaryFlags: [],
+    normalEffects: "No specific toxicological flags identified for general consumption.",
+    excessEffects: "Consume as part of a balanced diet.",
+    regulatory: "Permitted for commercial food preparation."
+  };
+}
+
+// ==========================================
+// 3. MAIN ANALYSIS & SCORING PIPELINE
+// ==========================================
+
+function analyzeIngredientText(rawInputText) {
+  const rawTokens = splitRawIngredients(rawInputText);
+  const parsedItems = [];
+  const seenIds = new Set();
+
+  rawTokens.forEach((token) => {
+    const result = parseIngredientToken(token);
+    if (result) {
+      // Prevent duplicate cards if the same ingredient appears twice
+      const uniqueKey = result.id.startsWith("gen-") ? result.name.toLowerCase() : result.id;
+      if (!seenIds.has(uniqueKey)) {
+        seenIds.add(uniqueKey);
+        parsedItems.push(result);
+      }
+    }
   });
 
-  async function lookupProduct() {
-    const query = barcodeInput.value.trim();
-    if (!query) return;
+  currentAnalyzedIngredients = parsedItems;
+  renderAnalysisDashboard(parsedItems);
+}
 
-    scanBtn.disabled = true;
-    scanBtn.textContent = "Checking...";
-    scanResult.innerHTML = `<div class="loading-box">Searching local and global food databases...</div>`;
+// ==========================================
+// 4. UI RENDERING & DASHBOARD ENGINE
+// ==========================================
 
-    // A. Check if user typed a single ingredient directly
-    const directMatch = parseIngredientToken(query);
-    if (directMatch && directMatch.category !== "Food Ingredient") {
-      renderSingleIngredientCard(directMatch);
-      resetScanButton();
-      return;
-    }
+function renderAnalysisDashboard(items) {
+  const container = document.getElementById("results-container");
+  if (!container) return;
 
-    // B. Search Open Food Facts API (Barcode or Name)
-    try {
-      let isBarcode = /^\d+$/.test(query);
-      let url = isBarcode
-        ? `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(query)}.json?fields=product_name,ingredients_text,image_front_url`
-        : `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1`;
-
-      const res = await fetch(url);
-      const data = await res.json();
-
-      let product = null;
-      if (isBarcode && data.status === 1) product = data.product;
-      else if (!isBarcode && data.products && data.products.length > 0) product = data.products[0];
-
-      if (product && product.ingredients_text) {
-        renderProductResult(product);
-      } else {
-        // C. Fallback: Parse user input text directly as ingredient list
-        renderRawIngredientsList(query);
-      }
-    } catch (err) {
-      renderRawIngredientsList(query);
-    } finally {
-      resetScanButton();
-    }
-  }
-
-  function resetScanButton() {
-    scanBtn.disabled = false;
-    scanBtn.textContent = "Check Product";
-  }
-
-  function renderRawIngredientsList(rawText) {
-    const rawItems = rawText.split(/[,;()\[\]]/);
-    processAndRenderItems(rawItems, "Scanned Ingredient Breakdown");
-  }
-
-  function renderProductResult(product) {
-    const name = product.product_name || "Packaged Food Product";
-    const img = product.image_front_url || "";
-    const rawItems = product.ingredients_text.split(/[,;()\[\]]/);
-    processAndRenderItems(rawItems, name, img);
-  }
-
-  function processAndRenderItems(rawItems, title, img = "") {
-    const processedList = [];
-
-    rawItems.forEach((raw) => {
-      const parsed = parseIngredientToken(raw);
-      if (parsed !== null) {
-        processedList.push(parsed);
-      }
-    });
-
-    if (processedList.length === 0) {
-      scanResult.innerHTML = `<div class="error-box">No valid ingredients could be identified from the input.</div>`;
-      return;
-    }
-
-    let safeCount = 0, cautionCount = 0, harmfulCount = 0;
-    processedList.forEach((item) => {
-      if (item.verdict === "safe") safeCount++;
-      else if (item.verdict === "caution") cautionCount++;
-      else if (item.verdict === "harmful") harmfulCount++;
-    });
-
-    let overallLabel = "Generally Safe";
-    let overallClass = "safe";
-    let overallMsg = "No high-risk additives flagged among recognized components.";
-
-    if (harmfulCount >= 1) {
-      overallLabel = "Use Caution";
-      overallClass = "harmful";
-      overallMsg = `Contains ${harmfulCount} ingredient(s) flagged for potential health concerns with high consumption.`;
-    } else if (cautionCount >= 2) {
-      overallLabel = "Moderate — Consume in Moderation";
-      overallClass = "caution";
-      overallMsg = `Contains several additives or sweeteners best enjoyed in moderation.`;
-    }
-
-    const rowsHtml = processedList.map((item) => `
-      <div class="ingredient-row" data-ing-id="${item.id}">
-        <span class="ing-name">${escapeHtml(item.name)}</span>
-        <span class="ing-tag tag-${item.verdict}">${capitalize(item.verdict)}</span>
-      </div>
-    `).join("");
-
-    scanResult.innerHTML = `
-      <div class="result-card">
-        <div class="result-header">
-          ${img ? `<img src="${img}" class="result-img" alt="${escapeHtml(title)}">` : ""}
-          <div class="result-title">${escapeHtml(title)}</div>
-        </div>
-        <div class="verdict-badge verdict-${overallClass}">${overallLabel}</div>
-        <p class="overall-msg">${overallMsg}</p>
-        <p class="overall-msg">${safeCount} safe · ${cautionCount} caution · ${harmfulCount} high concern</p>
-        <div class="ingredient-list">${rowsHtml}</div>
+  if (!items || items.length === 0) {
+    container.innerHTML = `
+      <div class="scansafe-empty-state">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <h3>No Valid Ingredients Detected</h3>
+        <p>Please check your ingredient text and try pasting again.</p>
       </div>`;
-
-    // Click row to view details modal
-    scanResult.querySelectorAll(".ingredient-row").forEach((row, index) => {
-      row.addEventListener("click", () => openModal(processedList[index]));
-    });
+    return;
   }
 
-  function renderSingleIngredientCard(item) {
-    scanResult.innerHTML = `
-      <div class="result-card">
-        <div class="result-header">
-          <div class="result-title">${escapeHtml(item.name)}</div>
-        </div>
-        <div class="verdict-badge verdict-${item.verdict}">${capitalize(item.verdict)}</div>
-        <p class="overall-msg">${escapeHtml(item.summary)}</p>
-        <div class="ingredient-list">
-          <div class="ingredient-row" id="singleIngRow">
-            <span class="ing-name">Click to view full scientific profile</span>
-            <span class="ing-tag tag-${item.verdict}">Details</span>
+  // 1. Calculate Risk Scores
+  let dangerCount = 0;
+  let cautionCount = 0;
+  let safeCount = 0;
+  const detectedAllergens = new Set();
+  const detectedFlags = new Set();
+
+  items.forEach((item) => {
+    if (item.verdict === "danger") dangerCount++;
+    else if (item.verdict === "caution") cautionCount++;
+    else safeCount++;
+
+    if (item.allergens) item.allergens.forEach((a) => detectedAllergens.add(a));
+    if (item.dietaryFlags) item.dietaryFlags.forEach((f) => detectedFlags.add(f));
+  });
+
+  // Determine Overall Rating
+  let overallStatus = "SAFE";
+  let overallClass = "status-safe";
+  let summaryText = "This product contains mostly recognized safe ingredients with low toxicological concern.";
+
+  if (dangerCount > 0) {
+    overallStatus = "HIGH CONCERN";
+    overallClass = "status-danger";
+    summaryText = `Contains ${dangerCount} high-concern additive(s) and potential health triggers. Review flagged ingredients below.`;
+  } else if (cautionCount > 0) {
+    overallStatus = "MODERATE CAUTION";
+    overallClass = "status-caution";
+    summaryText = `Contains ${cautionCount} ingredient(s) that cause blood sugar spikes or mild sensitivity in sensitive individuals.`;
+  }
+
+  // 2. Build Dashboard Header HTML
+  let html = `
+    <div class="scansafe-dashboard">
+      <!-- Executive Summary Banner -->
+      <div class="scansafe-summary-card ${overallClass}">
+        <div class="summary-header">
+          <div>
+            <span class="summary-badge">${overallStatus}</span>
+            <h2>Product Safety Audit</h2>
+          </div>
+          <div class="summary-metrics">
+            <span class="metric-tag danger"><strong>${dangerCount}</strong> High Risk</span>
+            <span class="metric-tag caution"><strong>${cautionCount}</strong> Caution</span>
+            <span class="metric-tag safe"><strong>${safeCount}</strong> Safe</span>
           </div>
         </div>
-      </div>`;
-
-    document.getElementById("singleIngRow").addEventListener("click", () => openModal(item));
-  }
-
-  /* ---------------------------------------
-     4. IMAGE OCR UPLOAD (OCR.SPACE API)
-  --------------------------------------- */
-  const imageInput = document.getElementById("imageInput");
-  const imagePreview = document.getElementById("imagePreview");
-  const imagePreviewContainer = document.getElementById("imagePreviewContainer");
-
-  if (imageInput) {
-    imageInput.addEventListener("change", async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      // Show image preview
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        imagePreview.src = event.target.result;
-        imagePreviewContainer.style.display = "block";
-      };
-      reader.readAsDataURL(file);
-
-      // Show processing state in scan result box
-      scanResult.innerHTML = `<div class="loading-box">Scanning ingredient label... Please wait.</div>`;
-
-      // Prepare payload for OCR.Space API
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("apikey", OCR_SPACE_API_KEY);
-      formData.append("language", "eng");
-      formData.append("OCREngine", "2"); // Engine 2 is optimized for small text & numbers
-      formData.append("isOverlayRequired", "false");
-
-      try {
-        const response = await fetch("https://api.ocr.space/parse/image", {
-          method: "POST",
-          body: formData
-        });
-
-        const data = await response.json();
-
-        if (data.IsErroredOnProcessing) {
-          scanResult.innerHTML = `<div class="error-box">Error reading image: ${data.ErrorMessage[0]}</div>`;
-          return;
+        <p class="summary-desc">${summaryText}</p>
+        
+        ${
+          detectedAllergens.size > 0
+            ? `<div class="allergen-alert-bar">
+                 <i class="fa-solid fa-bell"></i> <strong>Detected Allergens/Sensitivities:</strong> 
+                 ${Array.from(detectedAllergens).map((a) => `<span class="allergen-chip">${a}</span>`).join(" ")}
+               </div>`
+            : ""
         }
+      </div>
 
-        const extractedText = data.ParsedResults?.[0]?.ParsedText;
+      <!-- Quick Filter Bar -->
+      <div class="scansafe-filter-bar">
+        <span>Filter Ingredients:</span>
+        <button class="filter-btn active" onclick="filterScanSafeResults('all')">All (${items.length})</button>
+        <button class="filter-btn" onclick="filterScanSafeResults('danger')">High Concern (${dangerCount})</button>
+        <button class="filter-btn" onclick="filterScanSafeResults('caution')">Caution (${cautionCount})</button>
+        <button class="filter-btn" onclick="filterScanSafeResults('allergens')">Allergens (${detectedAllergens.size})</button>
+      </div>
 
-        if (!extractedText || extractedText.trim().length === 0) {
-          scanResult.innerHTML = `<div class="error-box">Could not read any clear text. Please try a brighter or closer photo.</div>`;
-          return;
-        }
+      <!-- Ingredient Cards Grid -->
+      <div class="scansafe-grid" id="scansafe-card-grid">
+  `;
 
-        // Pass extracted text into ingredient parsing pipeline
-        renderRawIngredientsList(extractedText);
+  // 3. Render Individual Ingredient Cards
+  items.forEach((item) => {
+    html += renderIngredientCard(item);
+  });
 
-      } catch (error) {
-        console.error("OCR Error:", error);
-        scanResult.innerHTML = `<div class="error-box">Failed to process the image. Please check your network connection.</div>`;
-      }
-    });
-  }
+  html += `
+      </div>
+    </div>
+  `;
 
-  /* ---------------------------------------
-     5. INGREDIENT LIBRARY SEARCH
-  --------------------------------------- */
-  const librarySearch = document.getElementById("librarySearch");
-  const libraryResults = document.getElementById("libraryResults");
+  container.innerHTML = html;
+}
 
-  function renderLibrary(list) {
-    if (list.length === 0) {
-      libraryResults.innerHTML = `<div class="empty-state">No ingredients matched your search.</div>`;
-      return;
-    }
-    libraryResults.innerHTML = list.map((item) => `
-      <div class="ing-card" data-ing-id="${item.id}">
-        <div class="ing-card-top">
-          <span class="ing-card-name">${escapeHtml(item.name)}</span>
-          <span class="ing-tag tag-${item.verdict}">${capitalize(item.verdict)}</span>
+function renderIngredientCard(item) {
+  const verdictClass = item.verdict === "danger" ? "card-danger" : item.verdict === "caution" ? "card-caution" : "card-safe";
+  const icon = item.verdict === "danger" ? "fa-circle-xmark" : item.verdict === "caution" ? "fa-triangle-exclamation" : "fa-circle-check";
+
+  return `
+    <div class="scansafe-card ${verdictClass}" data-verdict="${item.verdict}" data-allergens="${(item.allergens || []).length}">
+      <div class="card-header">
+        <div class="title-group">
+          <i class="fa-solid ${icon} verdict-icon"></i>
+          <div>
+            <h3>${escapeHtml(item.name)}</h3>
+            <span class="category-subtitle">${escapeHtml(item.category || "Ingredient")}</span>
+          </div>
         </div>
-        <div class="ing-card-cat">${escapeHtml(item.category)}${item.eNumber ? " · " + item.eNumber : ""}</div>
-        <p class="ing-card-summary">${escapeHtml(item.summary)}</p>
+        <span class="verdict-pill">${item.verdict.toUpperCase()}</span>
       </div>
-    `).join("");
 
-    libraryResults.querySelectorAll(".ing-card").forEach((card) => {
-      card.addEventListener("click", () => {
-        const item = INGREDIENT_DB.find((i) => i.id === card.dataset.ingId);
-        if (item) openModal(item);
-      });
-    });
-  }
+      <div class="card-body">
+        <p class="item-summary">${escapeHtml(item.summary)}</p>
 
-  renderLibrary(INGREDIENT_DB);
+        <div class="card-tags">
+          ${(item.allergens || []).map((a) => `<span class="tag allergen"><i class="fa-solid fa-wheat-awn"></i> ${a}</span>`).join("")}
+          ${(item.dietaryFlags || []).map((f) => `<span class="tag flag"><i class="fa-solid fa-shield-cat"></i> ${f}</span>`).join("")}
+        </div>
 
-  librarySearch.addEventListener("input", () => {
-    const q = librarySearch.value.trim();
-    renderLibrary(q ? searchIngredients(q) : INGREDIENT_DB);
+        <details class="item-details">
+          <summary>Detailed Health Analysis <i class="fa-solid fa-chevron-down"></i></summary>
+          <div class="details-content">
+            <p><strong>What it is:</strong> ${escapeHtml(item.whatItIs)}</p>
+            <p><strong>Primary Effects:</strong> ${escapeHtml(item.normalEffects)}</p>
+            <p><strong>Risks of High Intake:</strong> ${escapeHtml(item.excessEffects)}</p>
+            <p><strong>Regulatory Status:</strong> ${escapeHtml(item.regulatory)}</p>
+          </div>
+        </details>
+      </div>
+    </div>
+  `;
+}
+
+// Filter button toggle handler
+function filterScanSafeResults(category) {
+  currentFilter = category;
+  document.querySelectorAll(".filter-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.getAttribute("onclick").includes(`'${category}'`));
   });
 
-  /* ---------------------------------------
-     6. MODAL CONTROL
-  --------------------------------------- */
-  const modalOverlay = document.getElementById("modalOverlay");
-  const modalContent = document.getElementById("modalContent");
+  const cards = document.querySelectorAll(".scansafe-card");
+  cards.forEach((card) => {
+    const verdict = card.getAttribute("data-verdict");
+    const allergenCount = parseInt(card.getAttribute("data-allergens") || "0", 10);
 
-  function openModal(item) {
-    modalContent.innerHTML = `
-      <button class="modal-close" id="modalCloseBtn">&times;</button>
-      <div class="verdict-badge verdict-${item.verdict}">${capitalize(item.verdict)}</div>
-      <h2>${escapeHtml(item.name)}</h2>
-      <div class="modal-eyebrow">${escapeHtml(item.category || "Food Item")}${item.eNumber ? " · " + item.eNumber : ""}</div>
-
-      <div class="modal-section">
-        <h4>What It Is</h4>
-        <p>${escapeHtml(item.whatItIs || "Standard food component.")}</p>
-      </div>
-      <div class="modal-section">
-        <h4>Summary</h4>
-        <p>${escapeHtml(item.summary || "")}</p>
-      </div>
-      ${item.history ? `<div class="modal-section"><h4>History & Usage</h4><p>${escapeHtml(item.history)}</p></div>` : ""}
-      ${item.excessEffects ? `<div class="modal-section"><h4>Health Considerations</h4><p>${escapeHtml(item.excessEffects)}</p></div>` : ""}
-    `;
-    modalOverlay.classList.add("is-open");
-    document.getElementById("modalCloseBtn").addEventListener("click", closeModal);
-  }
-
-  function closeModal() {
-    modalOverlay.classList.remove("is-open");
-  }
-
-  modalOverlay.addEventListener("click", (e) => {
-    if (e.target === modalOverlay) closeModal();
+    if (category === "all") {
+      card.style.display = "block";
+    } else if (category === "allergens") {
+      card.style.display = allergenCount > 0 ? "block" : "none";
+    } else {
+      card.style.display = verdict === category ? "block" : "none";
+    }
   });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeModal();
-  });
+}
 
-  /* ---------------------------------------
-     7. UTILITY HELPERS
-  --------------------------------------- */
-  function escapeHtml(str) {
-    if (!str) return "";
-    const div = document.createElement("div");
-    div.textContent = str;
-    return div.innerHTML;
-  }
+function escapeHtml(str) {
+  if (!str) return "";
+  return str.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[m]));
+}
 
-  function capitalize(str) {
-    if (!str) return "";
-    return str.charAt(0).toUpperCase() + str.slice(1);
-  }
-
-  function capitalizeWords(str) {
-    return str.replace(/\b\w/g, (l) => l.toUpperCase());
-  }
-
-});
+// Utility test trigger for quick console/UI binding
+function runScanSafeDemo() {
+  const sampleList = "Enriched Wheat Flour, Water, High Fructose Corn Syrup, Palm Oil, Salt, Maltodextrin (INS 1400), Soy Lecithin (INS 322), Sodium Metabisulfite (INS 223), Ammonium Bicarbonate (INS 503ii), Sodium Bicarbonate (INS 500ii), Mono- and Diglycerides of Fatty Acids (INS 471), Sodium Stearoyl Lactylate (INS 481i), Artificial Vanilla Flavor, Caramel Color (INS 150d), BHT (INS 321), Potassium Sorbate (INS 202), Tartrazine (INS 102), Citric Acid (INS 330)";
+  analyzeIngredientText(sampleList);
+}
