@@ -257,3 +257,63 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
 });
+// ==========================================
+// ADD THIS TO THE BOTTOM OF YOUR MAIN JS FILE
+// ==========================================
+
+async function checkAnyIngredient(inputName) {
+  const query = inputName.toLowerCase().trim();
+
+  // 1. Check your ingredients-data.js file first
+  if (typeof ingredientsData !== 'undefined') {
+    // If ingredientsData is an Object
+    if (ingredientsData[query]) {
+      return ingredientsData[query];
+    }
+    // If ingredientsData is an Array
+    if (Array.isArray(ingredientsData)) {
+      const match = ingredientsData.find(item => 
+        (item.name && item.name.toLowerCase() === query) || 
+        (item.code && item.code.toLowerCase() === query)
+      );
+      if (match) return match;
+    }
+  }
+
+  // 2. Fallback: Search the free Open Food Facts Global API
+  try {
+    const response = await fetch(
+      `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1`
+    );
+    const data = await response.json();
+
+    if (data.products && data.products.length > 0) {
+      const product = data.products[0];
+      const additives = product.additives_tags || [];
+      
+      return {
+        name: product.product_name || inputName,
+        safety: additives.length > 0 ? "Caution (Additives Detected)" : "Safe / Natural",
+        details: `Found in Global Registry. Ingredients: ${product.ingredients_text || "Listed on product package"}. Detected additives: ${additives.join(', ') || 'None'}`
+      };
+    }
+  } catch (error) {
+    console.error("API Search Error:", error);
+  }
+
+  // 3. Fallback if not found anywhere
+  return {
+    name: inputName,
+    safety: "Unknown",
+    details: "Ingredient not found in local or global safety databases. Exercise standard caution."
+  };
+}
+
+// Example usage inside your existing button click handler:
+// async function onSearchButtonClicked() {
+//   const userInput = document.getElementById("your-input-id").value;
+//   const result = await checkAnyIngredient(userInput);
+//   
+//   // Update your UI with result.name, result.safety, and result.details
+//   console.log(result);
+// }
