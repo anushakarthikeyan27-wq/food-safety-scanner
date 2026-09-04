@@ -317,3 +317,34 @@ async function checkAnyIngredient(inputName) {
 //   // Update your UI with result.name, result.safety, and result.details
 //   console.log(result);
 // }
+// ADD THIS NEW HELPER FUNCTION TO SCRIPT.JS
+
+function parseComplexIngredient(rawText) {
+  let cleaned = rawText.toLowerCase().trim();
+
+  // 1. Skip junk tokens completely
+  if (
+    !cleaned || 
+    cleaned === 'ii' || 
+    cleaned === 'i' || 
+    /^\d+%$/.test(cleaned) || 
+    cleaned.includes('numbers in brackets')
+  ) {
+    return null; // Return null to ignore this item completely
+  }
+
+  // 2. Clean up percentages and special characters
+  cleaned = cleaned
+    .replace(/\d+%/g, '')
+    .replace(/\[|\]|\(|\)|\*|&/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // 3. Extract standalone INS/E-numbers (e.g., "503", "472e", "150d", "223", "500")
+  const numberMatch = cleaned.match(/\b([1-9][0-9]{2,3}[a-z]?)\b/);
+  
+  return {
+    cleanedText: cleaned,
+    insCode: numberMatch ? numberMatch[1] : null
+  };
+}
