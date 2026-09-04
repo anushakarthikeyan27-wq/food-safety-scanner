@@ -526,3 +526,86 @@ function runScanSafeDemo() {
   const sampleList = "Enriched Wheat Flour, Water, High Fructose Corn Syrup, Palm Oil, Salt, Maltodextrin (INS 1400), Soy Lecithin (INS 322), Sodium Metabisulfite (INS 223), Ammonium Bicarbonate (INS 503ii), Sodium Bicarbonate (INS 500ii), Mono- and Diglycerides of Fatty Acids (INS 471), Sodium Stearoyl Lactylate (INS 481i), Artificial Vanilla Flavor, Caramel Color (INS 150d), BHT (INS 321), Potassium Sorbate (INS 202), Tartrazine (INS 102), Citric Acid (INS 330)";
   analyzeIngredientText(sampleList);
 }
+// ==========================================
+// 5. EVENT LISTENERS & UI BINDINGS
+// ==========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const inputField = document.getElementById("ingredient-input");
+  const analyzeBtn = document.getElementById("analyze-btn");
+  const clearBtn = document.getElementById("clear-btn");
+  const cameraBtn = document.getElementById("camera-btn");
+  const fileInput = document.getElementById("camera-upload");
+  const loadingSpinner = document.getElementById("loading-spinner");
+
+  // --- A. Text Search / Manual Input Trigger ---
+  if (analyzeBtn && inputField) {
+    analyzeBtn.addEventListener("click", () => {
+      const text = inputField.value.trim();
+      if (!text) {
+        alert("Please paste or type an ingredient list first.");
+        return;
+      }
+      analyzeIngredientText(text);
+    });
+
+    // Optional: Trigger analysis on Ctrl+Enter or Command+Enter in textarea
+    inputField.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        const text = inputField.value.trim();
+        if (text) analyzeIngredientText(text);
+      }
+    });
+  }
+
+  // --- B. Clear Input Trigger ---
+  if (clearBtn && inputField) {
+    clearBtn.addEventListener("click", () => {
+      inputField.value = "";
+      const container = document.getElementById("results-container");
+      if (container) container.innerHTML = "";
+    });
+  }
+
+  // --- C. Camera / Image File Scanner (OCR) ---
+  if (cameraBtn && fileInput) {
+    // Open system camera/file browser when button is clicked
+    cameraBtn.addEventListener("click", () => {
+      fileInput.click();
+    });
+
+    // Process selected image with Tesseract.js OCR
+    fileInput.addEventListener("change", async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      // Show loader
+      if (loadingSpinner) loadingSpinner.style.display = "block";
+
+      try {
+        // Run OCR text extraction
+        const result = await Tesseract.recognize(file, "eng", {
+          logger: (m) => console.log("OCR Progress:", m)
+        });
+
+        const extractedText = result.data.text;
+
+        // Auto-fill the text area with OCR output
+        if (inputField) {
+          inputField.value = extractedText;
+        }
+
+        // Run ingredient safety analysis on the extracted text
+        analyzeIngredientText(extractedText);
+      } catch (error) {
+        console.error("OCR Scan Error:", error);
+        alert("Failed to read text from image. Please try taking a clearer photo.");
+      } finally {
+        // Hide loader
+        if (loadingSpinner) loadingSpinner.style.display = "none";
+        // Reset file input so user can scan the same file again if needed
+        fileInput.value = "";
+      }
+    });
+  }
+});
