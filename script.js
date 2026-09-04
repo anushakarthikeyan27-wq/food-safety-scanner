@@ -330,5 +330,48 @@ document.addEventListener("DOMContentLoaded", () => {
   function capitalizeWords(str) {
     return str.replace(/\b\w/g, (l) => l.toUpperCase());
   }
+// Add this inside your DOMContentLoaded event listener in script.js
 
+const imageInput = document.getElementById("imageInput");
+const imagePreview = document.getElementById("imagePreview");
+const imagePreviewContainer = document.getElementById("imagePreviewContainer");
+
+if (imageInput) {
+  imageInput.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Show image preview
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      imagePreview.src = event.target.result;
+      imagePreviewContainer.style.display = "block";
+    };
+    reader.readAsDataURL(file);
+
+    // Show processing state in scan result box
+    scanResult.innerHTML = `<div class="loading-box"> Scanning text from image... Please wait a moment.</div>`;
+
+    try {
+      // Run OCR using Tesseract.js
+      const result = await Tesseract.recognize(file, 'eng', {
+        logger: (m) => console.log(m) // Logs progress to browser console
+      });
+
+      const extractedText = result.data.text;
+
+      if (!extractedText || extractedText.trim().length === 0) {
+        scanResult.innerHTML = `<div class="error-box">Could not read clear text from the image. Please try a clearer or brighter photo.</div>`;
+        return;
+      }
+
+      // Automatically pass extracted text into your existing ingredient processing pipeline
+      renderRawIngredientsList(extractedText);
+
+    } catch (error) {
+      console.error("OCR Error:", error);
+      scanResult.innerHTML = `<div class="error-box">Failed to process the image. Please try again.</div>`;
+    }
+  });
+}
 });
