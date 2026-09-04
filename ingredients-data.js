@@ -288,3 +288,18 @@ function matchIngredientText(text) {
     );
   }) || null;
 }
+// ADD THESE TO YOUR EXISTING ingredientsData OBJECT/ARRAY:
+
+"refined wheat flour": { name: "Refined Wheat Flour (Maida)", safety: "Caution", details: "High glycemic index; stripped of natural fiber." },
+"maida": { name: "Refined Wheat Flour (Maida)", safety: "Caution", details: "High glycemic index; stripped of natural fiber." },
+"sugar": { name: "Sugar", safety: "Caution", details: "Added sweetener; high intake contributes to energy spikes." },
+"refined palm oil": { name: "Refined Palm Oil", safety: "Moderate Risk", details: "High in saturated fats." },
+"invert sugar syrup": { name: "Invert Sugar Syrup", safety: "Caution", details: "Added sweetener; rapidly elevates blood glucose levels." },
+"milk solids": { name: "Milk Solids", safety: "Safe", details: "Dairy nutrient source; contains lactose allergen." },
+
+// INS Numbers found on Marie Gold packs:
+"503": { name: "Ammonium Carbonates (INS 503)", safety: "Safe", details: "Leavening agent / baking soda." },
+"500": { name: "Sodium Carbonates (INS 500)", safety: "Safe", details: "Baking soda / acidity regulator." },
+"472e": { name: "DATEM (INS 472e)", safety: "Safe", details: "Emulsifier used to improve biscuit texture." },
+"223": { name: "Sodium Metabisulfite (INS 223)", safety: "Caution", details: "Preservative; contains sulphites which may trigger asthma." },
+"150d": { name: "Sulphite Ammonia Caramel (INS 150d)", safety: "Moderate Risk", details: "Caramel coloring agent." }
