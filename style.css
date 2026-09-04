@@ -2,6 +2,64 @@
    SCANSAFE — Ingredient Awareness App
    Palette: warm paper white, deep forest green, editorial serif
    ============================================ */
+/* ScanSafe Engine UI Theme */
+.scansafe-dashboard {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.scansafe-summary-card {
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  color: #1a1a1a;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.scansafe-summary-card.status-safe { background-color: #f0fdf4; border: 1px solid #bbf7d0; }
+.scansafe-summary-card.status-caution { background-color: #fffbeb; border: 1px solid #fef08a; }
+.scansafe-summary-card.status-danger { background-color: #fef2f2; border: 1px solid #fecaca; }
+
+.summary-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.summary-badge { font-size: 0.75rem; font-weight: 700; letter-spacing: 1px; padding: 4px 8px; border-radius: 4px; text-transform: uppercase; background: rgba(0,0,0,0.08); }
+
+.summary-metrics { display: flex; gap: 8px; }
+.metric-tag { padding: 6px 12px; border-radius: 20px; font-size: 0.85rem; background: #ffffff; border: 1px solid #e5e7eb; }
+.metric-tag.danger strong { color: #dc2626; }
+.metric-tag.caution strong { color: #d97706; }
+.metric-tag.safe strong { color: #16a34a; }
+
+.allergen-alert-bar { margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(0,0,0,0.08); font-size: 0.9rem; }
+.allergen-chip { background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 12px; font-weight: 600; font-size: 0.8rem; }
+
+.scansafe-filter-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+.filter-btn { padding: 8px 16px; border-radius: 20px; border: 1px solid #d1d5db; background: #fff; cursor: pointer; transition: all 0.2s; }
+.filter-btn.active { background: #111827; color: #fff; border-color: #111827; }
+
+.scansafe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.scansafe-card { background: #fff; border-radius: 10px; border: 1px solid #e5e7eb; padding: 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
+.scansafe-card.card-danger { border-left: 5px solid #dc2626; }
+.scansafe-card.card-caution { border-left: 5px solid #d97706; }
+.scansafe-card.card-safe { border-left: 5px solid #16a34a; }
+
+.card-header { display: flex; justify-content: space-between; align-items: flex-start; }
+.title-group { display: flex; gap: 10px; align-items: center; }
+.verdict-icon { font-size: 1.2rem; }
+.card-danger .verdict-icon { color: #dc2626; }
+.card-caution .verdict-icon { color: #d97706; }
+.card-safe .verdict-icon { color: #16a34a; }
+
+.verdict-pill { font-size: 0.7rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: #f3f4f6; }
+.card-tags { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+.tag { font-size: 0.75rem; padding: 3px 8px; border-radius: 6px; }
+.tag.allergen { background: #fee2e2; color: #991b1b; }
+.tag.flag { background: #f3f4f6; color: #374151; }
+
+.item-details { margin-top: 12px; font-size: 0.85rem; color: #4b5563; }
+.item-details summary { cursor: pointer; font-weight: 600; outline: none; }
+.details-content { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e5e7eb; }
 .photo-upload-container {
   margin: 15px 0;
   text-align: center;
