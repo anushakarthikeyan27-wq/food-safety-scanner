@@ -5,6 +5,12 @@
 document.addEventListener("DOMContentLoaded", () => {
 
   /* ---------------------------------------
+     0. CONFIGURATION & CONSTANTS
+  --------------------------------------- */
+  // Paste your personal free key from https://ocr.space/ocrapi inside the quotes below
+  const OCR_SPACE_API_KEY = "K84354423788957"; 
+
+  /* ---------------------------------------
      1. TAB SWITCHING
   --------------------------------------- */
   const tabBtns = document.querySelectorAll(".tab-btn");
@@ -237,7 +243,68 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /* ---------------------------------------
-     4. INGREDIENT LIBRARY SEARCH
+     4. IMAGE OCR UPLOAD (OCR.SPACE API)
+  --------------------------------------- */
+  const imageInput = document.getElementById("imageInput");
+  const imagePreview = document.getElementById("imagePreview");
+  const imagePreviewContainer = document.getElementById("imagePreviewContainer");
+
+  if (imageInput) {
+    imageInput.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      // Show image preview
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        imagePreview.src = event.target.result;
+        imagePreviewContainer.style.display = "block";
+      };
+      reader.readAsDataURL(file);
+
+      // Show processing state in scan result box
+      scanResult.innerHTML = `<div class="loading-box">Scanning ingredient label... Please wait.</div>`;
+
+      // Prepare payload for OCR.Space API
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("apikey", OCR_SPACE_API_KEY);
+      formData.append("language", "eng");
+      formData.append("OCREngine", "2"); // Engine 2 is optimized for small text & numbers
+      formData.append("isOverlayRequired", "false");
+
+      try {
+        const response = await fetch("https://api.ocr.space/parse/image", {
+          method: "POST",
+          body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.IsErroredOnProcessing) {
+          scanResult.innerHTML = `<div class="error-box">Error reading image: ${data.ErrorMessage[0]}</div>`;
+          return;
+        }
+
+        const extractedText = data.ParsedResults?.[0]?.ParsedText;
+
+        if (!extractedText || extractedText.trim().length === 0) {
+          scanResult.innerHTML = `<div class="error-box">Could not read any clear text. Please try a brighter or closer photo.</div>`;
+          return;
+        }
+
+        // Pass extracted text into ingredient parsing pipeline
+        renderRawIngredientsList(extractedText);
+
+      } catch (error) {
+        console.error("OCR Error:", error);
+        scanResult.innerHTML = `<div class="error-box">Failed to process the image. Please check your network connection.</div>`;
+      }
+    });
+  }
+
+  /* ---------------------------------------
+     5. INGREDIENT LIBRARY SEARCH
   --------------------------------------- */
   const librarySearch = document.getElementById("librarySearch");
   const libraryResults = document.getElementById("libraryResults");
@@ -274,7 +341,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   /* ---------------------------------------
-     5. MODAL CONTROL
+     6. MODAL CONTROL
   --------------------------------------- */
   const modalOverlay = document.getElementById("modalOverlay");
   const modalContent = document.getElementById("modalContent");
@@ -313,7 +380,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   /* ---------------------------------------
-     6. UTILITY HELPERS
+     7. UTILITY HELPERS
   --------------------------------------- */
   function escapeHtml(str) {
     if (!str) return "";
@@ -330,48 +397,5 @@ document.addEventListener("DOMContentLoaded", () => {
   function capitalizeWords(str) {
     return str.replace(/\b\w/g, (l) => l.toUpperCase());
   }
-// Add this inside your DOMContentLoaded event listener in script.js
 
-const imageInput = document.getElementById("imageInput");
-const imagePreview = document.getElementById("imagePreview");
-const imagePreviewContainer = document.getElementById("imagePreviewContainer");
-
-if (imageInput) {
-  imageInput.addEventListener("change", async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    // Show image preview
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      imagePreview.src = event.target.result;
-      imagePreviewContainer.style.display = "block";
-    };
-    reader.readAsDataURL(file);
-
-    // Show processing state in scan result box
-    scanResult.innerHTML = `<div class="loading-box"> Scanning text from image... Please wait a moment.</div>`;
-
-    try {
-      // Run OCR using Tesseract.js
-      const result = await Tesseract.recognize(file, 'eng', {
-        logger: (m) => console.log(m) // Logs progress to browser console
-      });
-
-      const extractedText = result.data.text;
-
-      if (!extractedText || extractedText.trim().length === 0) {
-        scanResult.innerHTML = `<div class="error-box">Could not read clear text from the image. Please try a clearer or brighter photo.</div>`;
-        return;
-      }
-
-      // Automatically pass extracted text into your existing ingredient processing pipeline
-      renderRawIngredientsList(extractedText);
-
-    } catch (error) {
-      console.error("OCR Error:", error);
-      scanResult.innerHTML = `<div class="error-box">Failed to process the image. Please try again.</div>`;
-    }
-  });
-}
 });
