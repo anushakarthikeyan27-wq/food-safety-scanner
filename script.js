@@ -1,6 +1,6 @@
 /**
  * ScanSafe Engine v2.0 - Core Logic
- * Includes advanced tokenization, E-number parsing, hazard scoring, dynamic UI rendering, and personalized safety overrides.
+ * Includes advanced tokenization, E-number parsing, hazard scoring, and dynamic UI rendering.
  */
 
 // ==========================================
@@ -219,8 +219,10 @@ let currentFilter = "all";
 function splitRawIngredients(rawInput) {
   if (!rawInput || typeof rawInput !== "string") return [];
 
+  // Replace newlines and clean redundant spaces
   let cleaned = rawInput.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
 
+  // Split on commas or semicolons NOT inside parentheses
   const tokens = [];
   let currentToken = "";
   let insideParentheses = 0;
@@ -258,10 +260,12 @@ function parseIngredientToken(rawToken) {
 
   if (normalized.length < 2) return null;
 
+  // Extract potential E/INS code (e.g. "INS 1400", "503ii", "E102", "150d")
   const codeMatch = normalized.match(/(?:ins|e)?\s*([1-9][0-9]{2,3}(?:[a-z]{1,3})?)\b/i);
   const extractedCode = codeMatch ? codeMatch[1].toLowerCase() : null;
   const baseCode = extractedCode ? extractedCode.replace(/[a-z]+$/i, "") : null;
 
+  // Clean string without parentheses for name matching
   let cleanNameOnly = normalized.replace(/\(.*?\)/g, "").replace(/\s+/g, " ").trim();
 
   // PASS 1: Direct Match on DB Name or Exact Alias
@@ -335,6 +339,7 @@ function analyzeIngredientText(rawInputText) {
   rawTokens.forEach((token) => {
     const result = parseIngredientToken(token);
     if (result) {
+      // Prevent duplicate cards if the same ingredient appears twice
       const uniqueKey = result.id.startsWith("gen-") ? result.name.toLowerCase() : result.id;
       if (!seenIds.has(uniqueKey)) {
         seenIds.add(uniqueKey);
@@ -365,30 +370,15 @@ function renderAnalysisDashboard(items) {
     return;
   }
 
-  // Check against active user restrictions (Section 6 feature)
-  const userRestrictions = getUserRestrictions();
-
+  // 1. Calculate Risk Scores
   let dangerCount = 0;
   let cautionCount = 0;
   let safeCount = 0;
   const detectedAllergens = new Set();
   const detectedFlags = new Set();
-  const personalAlerts = [];
 
   items.forEach((item) => {
-    // Determine personal conflict
-    let personalConflict = false;
-    if (userRestrictions.length > 0) {
-      const itemAttributes = [...(item.allergens || []), ...(item.dietaryFlags || [])].map((s) => s.toLowerCase());
-      userRestrictions.forEach((r) => {
-        if (itemAttributes.some((attr) => attr.includes(r.toLowerCase()))) {
-          personalConflict = true;
-          personalAlerts.push(`${item.name} conflicts with your "${r}" restriction.`);
-        }
-      });
-    }
-
-    if (item.verdict === "danger" || personalConflict) dangerCount++;
+    if (item.verdict === "danger") dangerCount++;
     else if (item.verdict === "caution") cautionCount++;
     else safeCount++;
 
@@ -396,6 +386,7 @@ function renderAnalysisDashboard(items) {
     if (item.dietaryFlags) item.dietaryFlags.forEach((f) => detectedFlags.add(f));
   });
 
+  // Determine Overall Rating
   let overallStatus = "SAFE";
   let overallClass = "status-safe";
   let summaryText = "This product contains mostly recognized safe ingredients with low toxicological concern.";
@@ -403,15 +394,17 @@ function renderAnalysisDashboard(items) {
   if (dangerCount > 0) {
     overallStatus = "HIGH CONCERN";
     overallClass = "status-danger";
-    summaryText = `Contains ${dangerCount} high-concern additive(s) or personal allergy triggers. Review flagged items below.`;
+    summaryText = `Contains ${dangerCount} high-concern additive(s) and potential health triggers. Review flagged ingredients below.`;
   } else if (cautionCount > 0) {
     overallStatus = "MODERATE CAUTION";
     overallClass = "status-caution";
     summaryText = `Contains ${cautionCount} ingredient(s) that cause blood sugar spikes or mild sensitivity in sensitive individuals.`;
   }
 
+  // 2. Build Dashboard Header HTML
   let html = `
     <div class="scansafe-dashboard">
+      <!-- Executive Summary Banner -->
       <div class="scansafe-summary-card ${overallClass}">
         <div class="summary-header">
           <div>
@@ -427,16 +420,8 @@ function renderAnalysisDashboard(items) {
         <p class="summary-desc">${summaryText}</p>
         
         ${
-          personalAlerts.length > 0
-            ? `<div class="personal-alert-bar" style="background:#fff0f0; border-left:4px solid #d9534f; padding:8px 12px; margin-top:10px; border-radius:4px; font-size:0.9em; color:#a94442;">
-                <i class="fa-solid fa-triangle-exclamation"></i> <strong>Personal Profile Warning:</strong> ${personalAlerts.join(" ")}
-               </div>`
-            : ""
-        }
-
-        ${
           detectedAllergens.size > 0
-            ? `<div class="allergen-alert-bar" style="margin-top:8px;">
+            ? `<div class="allergen-alert-bar">
                  <i class="fa-solid fa-bell"></i> <strong>Detected Allergens/Sensitivities:</strong> 
                  ${Array.from(detectedAllergens).map((a) => `<span class="allergen-chip">${a}</span>`).join(" ")}
                </div>`
@@ -444,20 +429,22 @@ function renderAnalysisDashboard(items) {
         }
       </div>
 
+      <!-- Quick Filter Bar -->
       <div class="scansafe-filter-bar">
         <span>Filter Ingredients:</span>
         <button class="filter-btn active" onclick="filterScanSafeResults('all')">All (${items.length})</button>
         <button class="filter-btn" onclick="filterScanSafeResults('danger')">High Concern (${dangerCount})</button>
         <button class="filter-btn" onclick="filterScanSafeResults('caution')">Caution (${cautionCount})</button>
         <button class="filter-btn" onclick="filterScanSafeResults('allergens')">Allergens (${detectedAllergens.size})</button>
-        <button class="export-btn" onclick="exportAuditReport()" style="margin-left:auto; cursor:pointer;"><i class="fa-solid fa-download"></i> Export JSON</button>
       </div>
 
+      <!-- Ingredient Cards Grid -->
       <div class="scansafe-grid" id="scansafe-card-grid">
   `;
 
+  // 3. Render Individual Ingredient Cards
   items.forEach((item) => {
-    html += renderIngredientCard(item, userRestrictions);
+    html += renderIngredientCard(item);
   });
 
   html += `
@@ -468,31 +455,21 @@ function renderAnalysisDashboard(items) {
   container.innerHTML = html;
 }
 
-function renderIngredientCard(item, userRestrictions = []) {
-  let isPersonalRisk = false;
-  const combinedFlags = [...(item.allergens || []), ...(item.dietaryFlags || [])];
-  
-  if (userRestrictions.length > 0) {
-    isPersonalRisk = userRestrictions.some((r) =>
-      combinedFlags.some((f) => f.toLowerCase().includes(r.toLowerCase()))
-    );
-  }
-
-  const effectiveVerdict = isPersonalRisk ? "danger" : item.verdict;
-  const verdictClass = effectiveVerdict === "danger" ? "card-danger" : effectiveVerdict === "caution" ? "card-caution" : "card-safe";
-  const icon = effectiveVerdict === "danger" ? "fa-circle-xmark" : effectiveVerdict === "caution" ? "fa-triangle-exclamation" : "fa-circle-check";
+function renderIngredientCard(item) {
+  const verdictClass = item.verdict === "danger" ? "card-danger" : item.verdict === "caution" ? "card-caution" : "card-safe";
+  const icon = item.verdict === "danger" ? "fa-circle-xmark" : item.verdict === "caution" ? "fa-triangle-exclamation" : "fa-circle-check";
 
   return `
-    <div class="scansafe-card ${verdictClass}" data-verdict="${effectiveVerdict}" data-allergens="${(item.allergens || []).length}">
+    <div class="scansafe-card ${verdictClass}" data-verdict="${item.verdict}" data-allergens="${(item.allergens || []).length}">
       <div class="card-header">
         <div class="title-group">
           <i class="fa-solid ${icon} verdict-icon"></i>
           <div>
-            <h3>${escapeHtml(item.name)} ${isPersonalRisk ? '<span style="color:#d9534f; font-size:0.75em;">(Personal Alert)</span>' : ""}</h3>
+            <h3>${escapeHtml(item.name)}</h3>
             <span class="category-subtitle">${escapeHtml(item.category || "Ingredient")}</span>
           </div>
         </div>
-        <span class="verdict-pill">${effectiveVerdict.toUpperCase()}</span>
+        <span class="verdict-pill">${item.verdict.toUpperCase()}</span>
       </div>
 
       <div class="card-body">
@@ -517,6 +494,7 @@ function renderIngredientCard(item, userRestrictions = []) {
   `;
 }
 
+// Filter button toggle handler
 function filterScanSafeResults(category) {
   currentFilter = category;
   document.querySelectorAll(".filter-btn").forEach((btn) => {
@@ -543,6 +521,7 @@ function escapeHtml(str) {
   return str.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[m]));
 }
 
+// Utility test trigger for quick console/UI binding
 function runScanSafeDemo() {
   const sampleList = "Enriched Wheat Flour, Water, High Fructose Corn Syrup, Palm Oil, Salt, Maltodextrin (INS 1400), Soy Lecithin (INS 322), Sodium Metabisulfite (INS 223), Ammonium Bicarbonate (INS 503ii), Sodium Bicarbonate (INS 500ii), Mono- and Diglycerides of Fatty Acids (INS 471), Sodium Stearoyl Lactylate (INS 481i), Artificial Vanilla Flavor, Caramel Color (INS 150d), BHT (INS 321), Potassium Sorbate (INS 202), Tartrazine (INS 102), Citric Acid (INS 330)";
   analyzeIngredientText(sampleList);
@@ -571,6 +550,7 @@ document.addEventListener("DOMContentLoaded", () => {
       analyzeIngredientText(text);
     });
 
+    // Optional: Trigger analysis on Ctrl+Enter or Command+Enter in textarea
     inputField.addEventListener("keydown", (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         const text = inputField.value.trim();
@@ -590,97 +570,43 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- C. Camera / Image File Scanner (OCR) ---
   if (cameraBtn && fileInput) {
+    // Open system camera/file browser when button is clicked
     cameraBtn.addEventListener("click", () => {
       fileInput.click();
     });
 
+    // Process selected image with Tesseract.js OCR
     fileInput.addEventListener("change", async (event) => {
       const file = event.target.files[0];
       if (!file) return;
 
+      // Show loader
       if (loadingSpinner) loadingSpinner.style.display = "block";
 
       try {
-        if (typeof Tesseract === "undefined") {
-          throw new Error("Tesseract.js library not loaded. Make sure the CDN script is included in index.html.");
-        }
-
+        // Run OCR text extraction
         const result = await Tesseract.recognize(file, "eng", {
           logger: (m) => console.log("OCR Progress:", m)
         });
 
         const extractedText = result.data.text;
 
+        // Auto-fill the text area with OCR output
         if (inputField) {
           inputField.value = extractedText;
         }
 
+        // Run ingredient safety analysis on the extracted text
         analyzeIngredientText(extractedText);
       } catch (error) {
         console.error("OCR Scan Error:", error);
-        alert("Failed to read text from image. " + error.message);
+        alert("Failed to read text from image. Please try taking a clearer photo.");
       } finally {
+        // Hide loader
         if (loadingSpinner) loadingSpinner.style.display = "none";
+        // Reset file input so user can scan the same file again if needed
         fileInput.value = "";
       }
     });
   }
 });
-
-// ==========================================
-// 6. ENHANCEMENTS: PERSONALIZED PROFILE & EXPORT
-// ==========================================
-
-/**
- * Fetches user dietary restrictions saved in LocalStorage.
- */
-function getUserRestrictions() {
-  try {
-    const data = localStorage.getItem("scansafe_user_restrictions");
-    return data ? JSON.parse(data) : [];
-  } catch (e) {
-    return [];
-  }
-}
-
-/**
- * Saves personal allergen/dietary flags to customize audit scoring.
- * Call this function from your UI profile panel.
- * Example: saveUserRestrictions(["Soy", "Gluten", "High Glycemic Index"]);
- */
-function saveUserRestrictions(restrictionsArray) {
-  if (Array.isArray(restrictionsArray)) {
-    localStorage.setItem("scansafe_user_restrictions", JSON.stringify(restrictionsArray));
-    if (currentAnalyzedIngredients.length > 0) {
-      renderAnalysisDashboard(currentAnalyzedIngredients);
-    }
-  }
-}
-
-/**
- * Exports the processed analysis as a JSON report file for local download.
- */
-function exportAuditReport() {
-  if (!currentAnalyzedIngredients || currentAnalyzedIngredients.length === 0) {
-    alert("No analysis available to export.");
-    return;
-  }
-
-  const reportData = {
-    timestamp: new Date().toISOString(),
-    totalIngredientsAnalyzed: currentAnalyzedIngredients.length,
-    userRestrictionsApplied: getUserRestrictions(),
-    ingredients: currentAnalyzedIngredients
-  };
-
-  const jsonBlob = new Blob([JSON.stringify(reportData, null, 2)], { type: "application/json" });
-  const downloadUrl = URL.createObjectURL(jsonBlob);
-  const linkElement = document.createElement("a");
-
-  linkElement.href = downloadUrl;
-  linkElement.download = `ScanSafe_Audit_Report_${Date.now()}.json`;
-  document.body.appendChild(linkElement);
-  linkElement.click();
-  document.body.removeChild(linkElement);
-  URL.revokeObjectURL(downloadUrl);
-}
